@@ -8,6 +8,8 @@ import ssl
 from datetime import date
 from pathlib import Path
 
+from common import write_geojson
+
 
 def main():
     root = Path(__file__).resolve().parent.parent
@@ -68,14 +70,9 @@ def main():
         },
         "features": features,
     }
-    out_path = processed_dir / "incidencias-euskadi.geojson"
-    out_path.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    print(f"Guardado: {out_path} ({len(features)} incidencias)")
-
-    src_dir = root / "src" / "data" / "processed"
-    src_dir.mkdir(parents=True, exist_ok=True)
-    (src_dir / "incidencias-euskadi.geojson").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    print(f"Copiado a src: {src_dir / 'incidencias-euskadi.geojson'}")
+    processed, published = write_geojson("incidencias-euskadi.geojson", out)
+    print(f"Guardado: {processed} ({len(features)} incidencias)")
+    print(f"Publicado: {published}")
 
 
 if __name__ == "__main__":

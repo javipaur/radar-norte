@@ -1,0 +1,54 @@
+name: Actualizar datos
+
+# Actualiza los GeoJSON diariamente y publica el resultado en el repo.
+# Requiere que el proyecto esté subido a GitHub (ver README, "Actualizar datos").
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # cada día a las 06:00 UTC
+  workflow_dispatch: # también se puede lanzar a mano desde la pestaña Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: python -m pip install --upgrade pip pyproj
+
+      - name: Actualizar fuentes y publicar GeoJSON
+        id: update
+        # Si una fuente remota falla, el script conserva el último fichero bueno
+        # y termina con código 1. Aun así queremos commitear lo que sí se actualizó.
+        continue-on-error: true
+        run: python scripts/update_all.py
+
+      - name: Avisar de fuentes fallidas
+        if: steps.update.outcome == 'failure'
+        run: echo "::warning::Alguna fuente no se pudo actualizar; se conservaron los datos anteriores."
+
+      - name: Commitear datos actualizados
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/processed
+          if git diff --cached --quiet; then
+            echo "No hay cambios en los datos publicados."
+          else
+            git commit -m "chore: actualizar datos ($(date -u +%Y-%m-%d))"
+            git push
+          fi

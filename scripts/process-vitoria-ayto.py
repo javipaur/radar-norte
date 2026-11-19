@@ -4,12 +4,12 @@ Procesa el GeoJSON de radares/ubicaciones del Ayuntamiento de Vitoria (grupo 138
 a formato para Radar Norte.
 """
 import json
-from pathlib import Path
+
+from common import RAW_DIR, write_geojson
 
 
 def main():
-    root = Path(__file__).resolve().parent.parent
-    src = root / "data" / "raw" / "geoJSON_g_138.json"
+    src = RAW_DIR / "geoJSON_g_138.json"
     if not src.exists():
         print(f"No existe: {src}")
         return
@@ -43,15 +43,9 @@ def main():
         },
         "features": features_out,
     }
-    out_path = root / "data" / "processed" / "radares-vitoria-ayto.geojson"
-    out_path.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    print(f"Guardado: {out_path} ({len(features_out)} features)")
-
-    # copiar a public
-    pub = root / "public" / "data" / "processed" / "radares-vitoria-ayto.geojson"
-    pub.parent.mkdir(parents=True, exist_ok=True)
-    pub.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    print(f"Copiado a: {pub}")
+    processed, published = write_geojson("radares-vitoria-ayto.geojson", out)
+    print(f"Guardado: {processed} ({len(features_out)} features)")
+    print(f"Publicado: {published}")
 
 
 if __name__ == "__main__":

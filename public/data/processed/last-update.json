@@ -1,0 +1,12 @@
+{
+  "updated_at": "2026-11-19T10:59:37.981673+00:00",
+  "files": {
+    "incidencias-euskadi.geojson": 20,
+    "incidencias-navarra.geojson": 30,
+    "radares-pais-vasco-navarra-aragon.geojson": 614,
+    "radares-vitoria-ayto.geojson": 47,
+    "radares-vitoria-fotorrojo.geojson": 6,
+    "radares-vitoria-moviles-ayto.geojson": 47
+  },
+  "failed_sources": []
+}

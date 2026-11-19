@@ -1,9 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
+import {
+  ALL_CATEGORIES,
+  CATEGORIES,
+  INCIDENT_CATEGORY,
+  getCategory,
+  makeCategoryIcon,
+} from "./legend.jsx";
+import {
+  CATEGORY_COLORS,
+  collectPopupRows,
+  featurePaths,
+  featuresBounds,
+  mergeDuplicateFeatures,
+} from "./data-utils.js";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.2.0";
 
 function haversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -30,16 +44,83 @@ function getPointCoords(feature) {
   return null;
 }
 
+function LegendRow({ category, active, onToggle, tag }) {
+  const Icon = category.Icon;
+  return (
+    <li>
+      <button
+        type="button"
+        className="legend-btn"
+        aria-pressed={active}
+        onClick={onToggle}
+      >
+        <span className={`legend-badge legend-badge--${category.id}`} aria-hidden="true">
+          <Icon size={24} weight="fill" color="currentColor" />
+        </span>
+        <span className="legend-copy">
+          {tag && <span className="legend-tag">{tag}</span>}
+          <span className="legend-name">{category.label}</span>
+          <span className="legend-sub">{category.description}</span>
+        </span>
+        <span className="legend-hint">{category.colorHint}</span>
+      </button>
+    </li>
+  );
+}
+
+function FeaturePopup({ feature, category }) {
+  const props = feature.properties || {};
+  const rows = collectPopupRows(feature);
+  const typeLabel = ALL_CATEGORIES.find((c) => c.id === category)?.label || category;
+
+  return (
+    <div className="rn-popup">
+      <strong className="rn-popup-title">
+        {props.title || props.name || "Elemento del mapa"}
+      </strong>
+      <dl className="rn-popup-grid">
+        <div className="rn-popup-row">
+          <dt>Tipo</dt>
+          <dd>{typeLabel}</dd>
+        </div>
+        {rows.map((row) => (
+          <div className="rn-popup-row" key={row.key}>
+            <dt>{row.label}</dt>
+            <dd>
+              {row.key === "url" && typeof row.raw === "string" ? (
+                <a href={row.raw} target="_blank" rel="noreferrer">
+                  Abrir fuente
+                </a>
+              ) : (
+                row.value
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 export default function App() {
   const mapRef = useRef(null);
   const [features, setFeatures] = useState([]);
   const [status, setStatus] = useState("Cargando datos...");
   const [voiceOn, setVoiceOn] = useState(false);
-  const [showFixed, setShowFixed] = useState(true);
-  const [showMobiles, setShowMobiles] = useState(true);
-  const [showOsm, setShowOsm] = useState(true);
+  const [activeCategory, setActiveCategory] = useState(null);
   const [voiceStatus, setVoiceStatus] = useState("");
   const lastAlertRef = useRef(0);
+  const didFitRef = useRef(false);
+
+  const markerIcons = useMemo(
+    () => Object.fromEntries(ALL_CATEGORIES.map((c) => [c.id, makeCategoryIcon(c)])),
+    []
+  );
+
+  const { features: mergedFeatures, mergedCount } = useMemo(
+    () => mergeDuplicateFeatures(features),
+    [features]
+  );
 
   useEffect(() => {
     async function loadData() {
@@ -59,8 +140,21 @@ export default function App() {
         const vitoriaMovFeatures = vitoriaMovRes.status === "fulfilled" && vitoriaMovRes.value.ok ? (await vitoriaMovRes.value.json()).features || [] : [];
         const vitoriaFrFeatures = vitoriaFrRes.status === "fulfilled" && vitoriaFrRes.value.ok ? (await vitoriaFrRes.value.json()).features || [] : [];
         const all = [...radarFeatures, ...navFeatures, ...euskFeatures, ...vitoriaFeatures, ...vitoriaMovFeatures, ...vitoriaFrFeatures];
+        const merged = mergeDuplicateFeatures(all);
         setFeatures(all);
-        setStatus(`Datos cargados: ${all.length} elementos. (${new Date().toLocaleTimeString()})`);
+        // Encuadramos TODA la región la primera vez: si no, el mapa arranca en
+        // Vitoria (zoom 12) y elementos de Navarra/Aragón quedan fuera de pantalla.
+        // Solo una vez para que el refresco automático no mueva el mapa al usuario.
+        if (!didFitRef.current) {
+          didFitRef.current = true;
+          const bounds = featuresBounds(merged.features);
+          if (bounds && mapRef.current) {
+            mapRef.current.fitBounds(bounds, { padding: [24, 24], maxZoom: 13 });
+          }
+        }
+        setStatus(
+          `Datos cargados: ${all.length} elementos · ${merged.mergedCount} duplicados fusionados sin perder datos. (${new Date().toLocaleTimeString()})`
+        );
       } catch (e) {
         console.error(e);
         setStatus("Error cargando datos.");
@@ -92,21 +186,20 @@ export default function App() {
           mapRef.current.setView([lat, lon], 13);
         }
         setStatus(`Ubicación: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-        // Buscar cercano
         let closest = null;
         let closestDist = Infinity;
-        const filtered = getFilteredFeatures(features, showFixed, showMobiles, showOsm);
-        filtered.forEach((f) => {
-          const props = f.properties || {};
-          if ((props.source === "navarra" || props.source === "euskadi") && props.title) return;
-          const coords = getPointCoords(f);
-          if (!coords) return;
-          const dist = haversineDistance(lat, lon, coords.lat, coords.lon);
-          if (dist < closestDist) {
-            closestDist = dist;
-            closest = f;
-          }
-        });
+        mergedFeatures
+          .filter((f) => (activeCategory ? getCategory(f) === activeCategory : true))
+          .filter((f) => getCategory(f) !== "incidencias")
+          .forEach((f) => {
+            const coords = getPointCoords(f);
+            if (!coords) return;
+            const dist = haversineDistance(lat, lon, coords.lat, coords.lon);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closest = f;
+            }
+          });
         if (closest && closestDist <= 1500) {
           const now = Date.now();
           if (now - lastAlertRef.current > 30000) {
@@ -122,7 +215,7 @@ export default function App() {
       (err) => alert("No se pudo obtener ubicación: " + err.message),
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [features, showFixed, showMobiles, showOsm, speak]);
+  }, [mergedFeatures, activeCategory, speak]);
 
   const toggleVoice = () => {
     if (!("speechSynthesis" in window)) {
@@ -134,7 +227,13 @@ export default function App() {
     if (newState) speak("Alertas de voz activadas");
   };
 
-  const filtered = getFilteredFeatures(features, showFixed, showMobiles, showOsm);
+  const toggleCategory = (id) => {
+    setActiveCategory((current) => (current === id ? null : id));
+  };
+
+  const filtered = activeCategory
+    ? mergedFeatures.filter((f) => getCategory(f) === activeCategory)
+    : mergedFeatures;
 
   return (
     <div className="app">
@@ -143,26 +242,42 @@ export default function App() {
         <span className="version">v{APP_VERSION}</span>
       </header>
       <div className="controls">
-        <button onClick={handleLocate} title="Centrar en mi ubicación">📍 Mi ubicación</button>
-        <button onClick={toggleVoice}>{voiceOn ? "🔊 Voz: ON" : "🔊 Voz: OFF"}</button>
-        <label className="filter-label">
-          <input type="checkbox" checked={showFixed} onChange={(e) => setShowFixed(e.target.checked)} /> Radares fijos
-        </label>
-        <label className="filter-label">
-          <input type="checkbox" checked={showMobiles} onChange={(e) => setShowMobiles(e.target.checked)} /> Zonas móviles (INVIVE)
-        </label>
-        <label className="filter-label">
-          <input type="checkbox" checked={showOsm} onChange={(e) => setShowOsm(e.target.checked)} /> OSM (posibles)
-        </label>
+        <button type="button" onClick={handleLocate} title="Centrar en mi ubicación">📍 Mi ubicación</button>
+        <button type="button" onClick={toggleVoice} aria-pressed={voiceOn}>
+          {voiceOn ? "🔊 Voz: ON" : "🔊 Voz: OFF"}
+        </button>
       </div>
-      <div className="legend">
-        <span className="legend-item"><span className="dot" style={{ background: "#cc0000" }}></span> Fijo</span>
-        <span className="legend-item"><span className="dot" style={{ background: "#ff8800" }}></span> Zona móvil (INVIVE)</span>
-        <span className="legend-item"><span className="dot" style={{ background: "#888888" }}></span> Posible (OSM)</span>
-        <span className="legend-item"><span className="dot" style={{ background: "#d9534f" }}></span> Incidencia</span>
-        <span className="legend-item"><span className="dot" style={{ background: "#6b5b95" }}></span> Vitoria radar (Ayto)</span>
-        <span className="legend-item"><span className="dot" style={{ background: "#b22222" }}></span> Vitoria foto-rojo</span>
-      </div>
+      <nav className="legend" aria-label="Leyenda y filtros del mapa">
+        <div className="legend-header">
+          <span className="legend-title">Leyenda · Radar Norte</span>
+          <span className="legend-help">
+            {activeCategory
+              ? `Mostrando solo ${ALL_CATEGORIES.find((c) => c.id === activeCategory)?.label.toLowerCase()}`
+              : "Toca un tipo para filtrar el mapa"}
+          </span>
+          {activeCategory && (
+            <button type="button" className="legend-reset" onClick={() => setActiveCategory(null)}>
+              Ver todo
+            </button>
+          )}
+        </div>
+        <ul className="legend-list">
+          {CATEGORIES.map((category) => (
+            <LegendRow
+              key={category.id}
+              category={category}
+              active={activeCategory === category.id}
+              onToggle={() => toggleCategory(category.id)}
+            />
+          ))}
+          <LegendRow
+            category={INCIDENT_CATEGORY}
+            active={activeCategory === INCIDENT_CATEGORY.id}
+            onToggle={() => toggleCategory(INCIDENT_CATEGORY.id)}
+            tag="No son radares"
+          />
+        </ul>
+      </nav>
       <div className="map-container">
         <MapContainer ref={mapRef} center={[42.8467, -2.6716]} zoom={12} style={{ height: "100%", width: "100%" }}>
           <TileLayer
@@ -170,67 +285,41 @@ export default function App() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           {filtered.map((f, idx) => {
+            const category = getCategory(f);
+            const popup = (
+              <Popup>
+                <FeaturePopup feature={f} category={category} />
+              </Popup>
+            );
+            const paths = featurePaths(f);
+
+            if (paths) {
+              return (
+                <Polyline
+                  key={`line-${idx}`}
+                  positions={paths}
+                  pathOptions={{
+                    color: CATEGORY_COLORS[category],
+                    weight: 4,
+                    opacity: 0.85,
+                  }}
+                >
+                  {popup}
+                </Polyline>
+              );
+            }
+
             const coords = getPointCoords(f);
             if (!coords) return null;
-            const props = f.properties || {};
-            const source = props.source || "";
-            const kind = props.kind || "";
-
-            if ((source === "navarra" || source === "euskadi") && props.title) {
-              return (
-                <CircleMarker key={idx} center={[coords.lat, coords.lon]} radius={7} pathOptions={{ color: "#a94442", fillColor: "#d9534f", fillOpacity: 0.9 }}>
-                  <Popup>
-                    <strong>Incidencia: {props.title}</strong><br />
-                    Ubicación: {props.location || "N/D"}<br />
-                    {props.road && <>Carretera: {props.road} {props.pk || props.pkStart || ""}<br /></>}
-                    {props.severity && <>Gravedad/Nivel: {props.severity}<br /></>}
-                    {props.effect && <>Causa: {props.effect}<br /></>}
-                    <em>Fuente: {source === "navarra" ? "Gobierno de Navarra" : "Open Data Euskadi"}</em>
-                  </Popup>
-                </CircleMarker>
-              );
-            }
-            if (source === "vitoria_ayto" || source === "vitoria_ayto_movil") {
-              return (
-                <CircleMarker key={idx} center={[coords.lat, coords.lon]} radius={7} pathOptions={{ color: "#4a4a9e", fillColor: "#6b5b95", fillOpacity: 0.9 }}>
-                  <Popup>
-                    <strong>{props.name || "Ubicación radar (Vitoria)"}</strong><br />
-                    {props.address && <>{props.address}<br /></>}
-                    {props.notes && <><em>{props.notes}</em></>}
-                  </Popup>
-                </CircleMarker>
-              );
-            }
-            if (source === "vitoria_foto_rojo") {
-              return (
-                <CircleMarker key={idx} center={[coords.lat, coords.lon]} radius={7} pathOptions={{ color: "#8b0000", fillColor: "#b22222", fillOpacity: 0.9 }}>
-                  <Popup>
-                    <strong>Foto-rojo (Vitoria)</strong><br />
-                    {props.address && <>{props.address}<br /></>}
-                    {props.notes && <><em>{props.notes}</em></>}
-                  </Popup>
-                </CircleMarker>
-              );
-            }
-
-            let color = "#3388ff";
-            let label = props.name || "Radar";
-            if (source === "dgt_invive") { color = "#ff8800"; label = "Zona vigilancia móvil (INVIVE): " + (props.road_ref || label); }
-            else if (source === "osm" || source === "osm_notes") { color = "#888888"; label = "Posible radar (OSM): " + label; }
-            else if (kind === "fixed") { color = "#cc0000"; }
-            else if (kind === "mobile_recurring") { color = "#ff6600"; }
-
             return (
-              <CircleMarker key={idx} center={[coords.lat, coords.lon]} radius={6} pathOptions={{ color: "#333", fillColor: color, fillOpacity: 0.8 }}>
-                <Popup>
-                  <strong>{label}</strong><br />
-                  {props.road_ref && <>Vía: {props.road_ref}<br /></>}
-                  {props.maxspeed && <>Límite: {props.maxspeed} km/h<br /></>}
-                  {props.direction && <>Sentido: {props.direction}<br /></>}
-                  Fuente: {source}<br />
-                  {props.url && <a href={props.url} target="_blank" rel="noreferrer">Fuente</a>}
-                </Popup>
-              </CircleMarker>
+              <Marker
+                key={`point-${idx}`}
+                position={[coords.lat, coords.lon]}
+                icon={markerIcons[category]}
+                title={`${ALL_CATEGORIES.find((c) => c.id === category)?.label || "Punto"}: ${f.properties?.name || f.properties?.title || "sin nombre"}`}
+              >
+                {popup}
+              </Marker>
             );
           })}
         </MapContainer>
@@ -244,24 +333,4 @@ export default function App() {
       </div>
     </div>
   );
-}
-
-function getFilteredFeatures(features, showFixed, showMobiles, showOsm) {
-  return features.filter((f) => {
-    const props = f.properties || {};
-    const source = props.source || "";
-    const kind = props.kind || "";
-    const geomType = f.geometry ? f.geometry.type : null;
-
-    if ((source === "navarra" || source === "euskadi") && props.title) return true;
-    if (source === "vitoria_ayto" || source === "vitoria_ayto_movil" || source === "vitoria_foto_rojo") return true;
-    const isFixed = kind === "fixed" || (geomType === "Point" && ["dgt", "navarra", "euskadi", "donostia", "salamanca", "madrid", "osm"].includes(source) && kind !== "mobile_recurring");
-    const isMobileZone = source === "dgt_invive" || kind === "mobile_recurring";
-    const isOsm = source === "osm" || source === "osm_notes";
-    if (isOsm && showOsm) return true;
-    if (isMobileZone && showMobiles) return true;
-    if (isFixed && showFixed) return true;
-    if (!isOsm && !isMobileZone && isFixed && showFixed) return true;
-    return false;
-  });
 }

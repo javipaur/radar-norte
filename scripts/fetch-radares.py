@@ -8,6 +8,8 @@ import urllib.request
 import ssl
 from pathlib import Path
 
+from common import PUBLIC_DIR, write_geojson
+
 FEED_URL = "https://geiserx.github.io/radares-anunciados-ha/feed.geojson"
 STATUS_URL = "https://geiserx.github.io/radares-anunciados-ha/status.json"
 
@@ -98,14 +100,16 @@ def main():
         "features": features_out,
     }
 
-    out_path = processed_dir / "radares-pais-vasco-navarra-aragon.geojson"
-    out_path.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    print(f"Guardado: {out_path} ({len(features_out)} features)")
+    processed, published = write_geojson("radares-pais-vasco-navarra-aragon.geojson", out)
+    print(f"Guardado: {processed} ({len(features_out)} features)")
+    print(f"Publicado: {published}")
 
-    # También guardar status filtrado
-    status_out_path = processed_dir / "status.json"
-    status_out_path.write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Guardado: {status_out_path}")
+    # status.json no es GeoJSON: se copia tal cual a ambos destinos.
+    status_text = json.dumps(status, ensure_ascii=False, indent=2)
+    (processed_dir / "status.json").write_text(status_text, encoding="utf-8")
+    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+    (PUBLIC_DIR / "status.json").write_text(status_text, encoding="utf-8")
+    print("Guardado: status.json (processed + public)")
 
 
 if __name__ == "__main__":

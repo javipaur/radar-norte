@@ -31,5 +31,9 @@ venv/
 npm-debug.log*
 leo_p
 
+# Herramientas del entorno (artefactos temporales, no versionar)
+.playwright-mcp/
+.superpowers/
+
 # Data raw (optional: comment if you want to track raw downloads)
 # data/raw/

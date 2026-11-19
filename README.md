@@ -1,6 +1,6 @@
 # Radar Norte
 
-Aplicación web (React + Vite + Leaflet) para visualizar radares e incidencias de tráfico en **País Vasco, Navarra y Aragón** (con datos adicionales manuales de Vitoria-Gasteiz).
+Aplicación web (React + Vite + Leaflet) para visualizar radares e incidencias de tráfico en **País Vasco, Navarra y Aragón** (con datos adicionales de Vitoria-Gasteiz descargados automáticamente).
 
 > **Aviso importante**: Esta es una aplicación **informativa e independiente**, no oficial. No sustituye a la señalización vial ni a las indicaciones oficiales. Los datos pueden estar desactualizados o incompletos. Úsala bajo tu responsabilidad.
 
@@ -8,7 +8,7 @@ Aplicación web (React + Vite + Leaflet) para visualizar radares e incidencias d
 - Radares fijos y zonas de vigilancia intensificada (INVIVE)
 - Posibles radares mapeados en OpenStreetMap (no verificados)
 - Incidencias de tráfico (Navarra y Euskadi)
-- Ubicaciones de radares móviles y foto-rojo publicadas por el Ayuntamiento de Vitoria-Gasteiz (datos descargados manualmente del visor GeoVitoria)
+- Ubicaciones de radares móviles y foto-rojo publicadas por el Ayuntamiento de Vitoria-Gasteiz (datos descargados automáticamente del visor GeoVitoria)
 
 ## Stack
 - React 19 + Vite + react-leaflet / Leaflet
@@ -35,7 +35,7 @@ Salida en `dist/`.
 - **OpenStreetMap**: datos bajo **ODbL 1.0** (© OpenStreetMap contributors).
 - **Gobierno de Navarra** (incidencias): datos abiertos de Navarra, reutilización conforme a condiciones del portal.
 - **Open Data Euskadi** (incidencias): API/datos de tráfico, reutilización conforme a condiciones del portal.
-- **Ayuntamiento de Vitoria-Gasteiz (GeoVitoria)**: datos de ubicaciones/radares/foto-rojo descargados manualmente desde el visor público. Se usan conforme a las condiciones de uso del portal municipal.
+- **Ayuntamiento de Vitoria-Gasteiz (GeoVitoria)**: datos de ubicaciones/radares/foto-rojo descargados automáticamente desde el visor público. Se usan conforme a las condiciones de uso del portal municipal.
 
 **Siempre cita las fuentes originales** cuando redistribuyas o reutilices estos datos.
 
@@ -46,14 +46,39 @@ Salida en `dist/`.
 - Algunas jurisdicciones regulan el uso de avisadores de radares; verifica la legalidad en tu caso.
 
 ## Actualizar datos
-Ver `AGENTS.md` para detalles. Scripts principales:
+Todo el pipeline se lanza con un solo comando (descarga de fuentes + procesado + publicación):
+```bash
+npm run update-data
+```
+Esto ejecuta `scripts/update_all.py`, que descarga el feed de radares, las incidencias de Navarra y Euskadi y las capas de GeoVitoria, valida cada GeoJSON y publica siempre el resultado en `public/data/processed/` (además de la copia local en `data/processed/`). Escribe también `last-update.json` con la hora de la última actualización.
+
+- **Requisito Python**: `pyproj` (necesario para convertir las coordenadas de Navarra a WGS84). Instalable con `python -m pip install pyproj`.
+- Si una fuente remota falla (p. ej. GeoVitoria), se conserva el último fichero bueno en lugar de borrarlo: el aviso se imprime y el resto de fuentes se actualiza igualmente.
+- No se añaden fuentes nuevas sin revisar licencias y este README.
+
+### Scripts individuales
+Por si se quiere refrescar solo una fuente (también publican en `public/data/processed/`):
 ```bash
 python scripts/fetch-radares.py
 python scripts/fetch-incidencias-navarra.py
 python scripts/fetch-incidencias-euskadi.py
+python scripts/fetch-vitoria.py
 python scripts/process-vitoria-ayto.py
 python scripts/process-vitoria-extra.py
 ```
+
+### Pruebas
+```bash
+npm test
+```
+Ejecuta las pruebas JS (`tests/`) y Python (`scripts/test_*.py`): comprueban la fusión sin pérdida de duplicados, que no se fusionen entidades distintas que comparten coordenadas, el popup completo, los tramos completos, el encuadre del mapa (para que la A-10 y el resto de Navarra/Aragón no queden fuera de pantalla) y la frescura de los datos.
+
+### Actualización automática (GitHub Actions)
+`.github/workflows/update-data.yml` ejecuta `npm run update-data` cada día a las 06:00 UTC y permite lanzarlo a mano desde la pestaña **Actions** (`workflow_dispatch`). Cuando hay cambios, hace commit de `public/data/processed/`.
+
+> **Prerrequisito**: el repositorio debe estar subido a GitHub y tener configurado el `remote` (`git remote -v`). Mientras no exista ese remote, el workflow no puede hacer `git push`. Para habilitarlo: crea el repo en GitHub y ejecuta `git remote add origin <URL> && git push -u origin main`.
+
+Ver `AGENTS.md` para más detalle sobre fuentes y decisiones de datos.
 
 ## Licencia del código
 El código de esta aplicación se distribuye bajo licencia **MIT** (ver archivo LICENSE si se añade). Los datos tienen sus propias licencias (ver arriba).

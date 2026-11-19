@@ -5,15 +5,12 @@ Procesa los GeoJSON adicionales del Ayuntamiento de Vitoria:
 - geoJSON_4_5052.json -> radares-vitoria-fotorrojo.geojson
 """
 import json
-from pathlib import Path
+
+from common import RAW_DIR, write_geojson
 
 
 def main():
-    root = Path(__file__).resolve().parent.parent
-    raw = root / "data" / "raw"
-    processed = root / "data" / "processed"
-    pub = root / "public" / "data" / "processed"
-    pub.mkdir(parents=True, exist_ok=True)
+    raw = RAW_DIR
 
     # 1) Radar móvil (t)
     src1 = raw / "geoJSON_t_radar_móvil.json"
@@ -37,9 +34,8 @@ def main():
                 }
             })
         out = {"type": "FeatureCollection", "metadata": {"source": "Ayto Vitoria", "total": len(features_out)}, "features": features_out}
-        (processed / "radares-vitoria-moviles-ayto.geojson").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-        (pub / "radares-vitoria-moviles-ayto.geojson").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-        print(f"Procesado moviles: {len(features_out)}")
+        processed, published = write_geojson("radares-vitoria-moviles-ayto.geojson", out)
+        print(f"Procesado moviles: {len(features_out)} -> {published}")
 
     # 2) Foto-rojo (4_5052)
     src2 = raw / "geoJSON_4_5052.json"
@@ -62,9 +58,8 @@ def main():
                 }
             })
         out = {"type": "FeatureCollection", "metadata": {"source": "Ayto Vitoria - Foto-rojo", "total": len(features_out)}, "features": features_out}
-        (processed / "radares-vitoria-fotorrojo.geojson").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-        (pub / "radares-vitoria-fotorrojo.geojson").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-        print(f"Procesado foto-rojo: {len(features_out)}")
+        processed, published = write_geojson("radares-vitoria-fotorrojo.geojson", out)
+        print(f"Procesado foto-rojo: {len(features_out)} -> {published}")
 
 
 if __name__ == "__main__":
