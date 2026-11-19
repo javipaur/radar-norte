@@ -21,6 +21,9 @@ SCRIPTS = [
     ("GeoVitoria (raw)", "fetch-vitoria.py"),
     ("radares Vitoria", "process-vitoria-ayto.py"),
     ("móvil y foto-rojo Vitoria", "process-vitoria-extra.py"),
+    # Debe ir después de fetch-radares.py: la DGT solo da los dos extremos y
+    # aquí se reconstruye el trazado sobre la carretera (OSM), sin perder props.
+    ("trazado INVIVE (carretera real)", "fetch-invive-geometry.py"),
 ]
 
 

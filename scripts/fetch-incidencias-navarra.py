@@ -3,10 +3,19 @@
 Descarga incidencias de carreteras de Navarra (CSV) y las convierte a GeoJSON (WGS84).
 Publica siempre en public/data/processed/, que es lo que sirve Vite.
 """
+import json
 import ssl
 import urllib.request
 
-from common import NAVARRA_CSV_URL, RAW_DIR, parse_navarra_csv, write_geojson
+from common import (
+    NAVARRA_CSV_URL,
+    PROCESSED_DIR,
+    RAW_DIR,
+    merge_preserved_features,
+    navarra_id,
+    parse_navarra_csv,
+    write_geojson,
+)
 
 
 def fetch_csv():
@@ -30,6 +39,29 @@ def main():
         "EPSG:25830", "EPSG:4326", always_xy=True
     ).transform
     features = parse_navarra_csv(content, transformer)
+
+    # El CSV público cambia durante el día: una incidencia que desaparece de la
+    # fuente no debe borrar una localización que ya teníamos guardada.
+    previous_path = PROCESSED_DIR / "incidencias-navarra.geojson"
+    previous = []
+    if previous_path.exists():
+        try:
+            previous = json.loads(previous_path.read_text(encoding="utf-8")).get("features", [])
+        except (ValueError, OSError) as exc:
+            print(f"Aviso: no se pudo leer el GeoJSON anterior: {exc}")
+    # Archivos generados antes de añadir ids: se calcula el mismo id estable
+    # desde las propiedades para no duplicar las incidencias ya presentes.
+    for feature in previous:
+        if feature.get("id") is None:
+            p = feature.get("properties", {})
+            feature["id"] = navarra_id(
+                p.get("title"), p.get("location"), p.get("date"),
+                p.get("road"), p.get("pk"), p.get("type"),
+            )
+    conservadas = len(features)
+    features = merge_preserved_features(features, previous)
+    if len(features) > conservadas:
+        print(f"Conservadas {len(features) - conservadas} incidencias que el CSV ya no incluye.")
 
     out = {
         "type": "FeatureCollection",

@@ -42,6 +42,23 @@ header .version {
 .legend-reset:hover {
   background: #eee;
 }
+.controls button.control-active {
+  background: #eaf5ee;
+  border-color: #1a5f2a;
+  color: #1a5f2a;
+  font-weight: 700;
+}
+.raw-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: #33413a;
+  cursor: pointer;
+}
+.raw-toggle input {
+  accent-color: #1a5f2a;
+}
 .controls button:focus-visible,
 .legend-reset:focus-visible,
 .legend-btn:focus-visible {
@@ -158,6 +175,12 @@ header .version {
   position: absolute;
   top: -2px;
   right: -4px;
+}
+
+.legend-badge--raw {
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1px #d5dbde;
 }
 
 /* Colores compartidos entre leyenda y marcadores del mapa */

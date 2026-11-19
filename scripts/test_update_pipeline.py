@@ -33,6 +33,31 @@ class ParseNavarraTests(unittest.TestCase):
         self.assertEqual(new["properties"]["road"], "A-10")
         self.assertIn("limpieza de mediana", new["properties"]["details"])
         self.assertEqual(new["geometry"]["type"], "Point")
+        self.assertTrue(new.get("id"), "cada incidencia necesita un id estable")
+
+    def test_id_no_cambia_si_solo_cambia_la_ultima_actualizacion(self):
+        transformer = lambda x, y: (-1.6 + x / 1_000_000, 42.8 + y / 1_000_000)
+        actualizado = CSV_FIXTURE.replace("19 Nov 2026 10:19", "19 Nov 2026 12:45")
+        original = common.parse_navarra_csv(CSV_FIXTURE, transformer)
+        posterior = common.parse_navarra_csv(actualizado, transformer)
+
+        self.assertEqual(original[0]["id"], posterior[0]["id"])
+        self.assertEqual(len(posterior), len(original), "no debe duplicar por el cambio de fecha")
+
+    def test_id_desde_propiedades_coincide_con_el_del_csv(self):
+        transformer = lambda x, y: (-1.6 + x / 1_000_000, 42.8 + y / 1_000_000)
+        feature = common.parse_navarra_csv(CSV_FIXTURE, transformer)[0]
+        p = feature["properties"]
+        self.assertEqual(
+            feature["id"],
+            common.navarra_id(p["title"], p["location"], p["date"], p["road"], p["pk"], p["type"]),
+        )
+
+    def test_no_borra_una_incidencia_retirada_del_csv(self):
+        anterior = [{"type": "Feature", "id": "navarra-1", "geometry": None, "properties": {"source": "navarra"}}]
+        nuevo = [{"type": "Feature", "id": "navarra-2", "geometry": None, "properties": {"source": "navarra"}}]
+        resultado = common.merge_preserved_features(nuevo, anterior)
+        self.assertEqual({f["id"] for f in resultado}, {"navarra-1", "navarra-2"})
 
 
 class ValidateTests(unittest.TestCase):
@@ -83,16 +108,26 @@ class SyncTests(unittest.TestCase):
 
 
 class FreshnessTests(unittest.TestCase):
-    def test_public_navarra_coincide_con_csv_oficial(self):
-        """Integración: falla si el GeoJSON servido está desactualizado."""
-        import urllib.request
+    """El GeoJSON servido debe conservar TODAS las localizaciones, nunca borrarlas."""
 
-        try:
-            with urllib.request.urlopen(common.NAVARRA_CSV_URL, timeout=30) as resp:
-                remote = resp.read().decode("utf-8", errors="replace")
-        except Exception as exc:  # pragma: no cover - depende de la red
-            self.skipTest(f"sin red: {exc}")
+    @staticmethod
+    def _keys(features):
+        return {
+            (
+                f["properties"]["title"],
+                f["properties"]["road"],
+                f["properties"]["pk"],
+                f["properties"]["date"],
+            )
+            for f in features
+        }
 
+    def test_public_navarra_incluye_todas_las_del_csv_local(self):
+        """Falla si falta una localización; admite elementos extra (posibles).
+
+        Se compara con el CSV crudo guardado, no con la red: una fuente que
+        retira un aviso no debe borrar una localización que ya teníamos.
+        """
         try:
             from pyproj import Transformer
 
@@ -102,26 +137,66 @@ class FreshnessTests(unittest.TestCase):
         except ImportError:  # pragma: no cover - depende del entorno
             self.skipTest("pyproj no disponible")
 
-        def keys(features):
-            return {
-                (
-                    f["properties"]["title"],
-                    f["properties"]["road"],
-                    f["properties"]["pk"],
-                    f["properties"]["date"],
-                )
-                for f in features
-            }
-
-        remote_keys = keys(common.parse_navarra_csv(remote, transformer))
+        csv = (common.RAW_DIR / "incidencias-navarra.csv").read_text(encoding="utf-8")
+        csv_keys = self._keys(common.parse_navarra_csv(csv, transformer))
         local = json.loads(
             (common.PUBLIC_DIR / "incidencias-navarra.geojson").read_text(encoding="utf-8")
         )
-        self.assertEqual(
-            keys(local["features"]),
-            remote_keys,
-            "el GeoJSON servido no coincide con el CSV oficial (datos desactualizados)",
+        missing = csv_keys - self._keys(local["features"])
+        self.assertFalse(
+            missing,
+            f"faltan localizaciones del CSV en el GeoJSON servido: {sorted(missing)}",
         )
+
+    def test_copias_processed_y_public_coinciden(self):
+        """data/processed y public/data/processed deben tener los mismos elementos."""
+        for name in (
+            "incidencias-navarra.geojson",
+            "incidencias-euskadi.geojson",
+            "radares-pais-vasco-navarra-aragon.geojson",
+            "radares-vitoria-ayto.geojson",
+            "radares-vitoria-moviles-ayto.geojson",
+            "radares-vitoria-fotorrojo.geojson",
+        ):
+            processed = json.loads((common.PROCESSED_DIR / name).read_text(encoding="utf-8"))
+            public = json.loads((common.PUBLIC_DIR / name).read_text(encoding="utf-8"))
+            serializado = lambda data: {
+                json.dumps(f, sort_keys=True, ensure_ascii=False) for f in data["features"]
+            }
+            self.assertEqual(
+                serializado(processed),
+                serializado(public),
+                f"las copias de {name} no coinciden",
+            )
+
+
+class RadarFeedTests(unittest.TestCase):
+    """Una fuente que retira un aviso no debe borrar una localización guardada."""
+
+    def test_no_borra_localizaciones_del_feed_anterior(self):
+        merge_preserved_features = common.merge_preserved_features
+
+        anterior = [
+            {"type": "Feature", "id": "A", "geometry": None, "properties": {"source": "dgt"}},
+            {"type": "Feature", "id": "B", "geometry": None, "properties": {"source": "osm"}},
+        ]
+        nuevo = [
+            {"type": "Feature", "id": "A", "geometry": None, "properties": {"source": "dgt", "name": "actualizado"}}
+        ]
+        resultado = merge_preserved_features(nuevo, anterior)
+        ids = {f.get("id") for f in resultado}
+
+        self.assertEqual(len(resultado), 2)
+        self.assertIn("A", ids)
+        self.assertIn("B", ids, "la localización B no debe desaparecer")
+        self.assertEqual(resultado[0]["properties"]["name"], "actualizado")
+
+    def test_no_duplica_features_presentes_en_ambas_fuentes(self):
+        merge_preserved_features = common.merge_preserved_features
+
+        feature = {"type": "Feature", "id": "A", "geometry": None, "properties": {"source": "dgt"}}
+        resultado = merge_preserved_features([feature], [feature])
+        self.assertEqual(len(resultado), 1)
 
 
 if __name__ == "__main__":

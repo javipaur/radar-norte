@@ -8,7 +8,7 @@ import urllib.request
 import ssl
 from pathlib import Path
 
-from common import PUBLIC_DIR, write_geojson
+from common import PUBLIC_DIR, merge_preserved_features, write_geojson
 
 FEED_URL = "https://geiserx.github.io/radares-anunciados-ha/feed.geojson"
 STATUS_URL = "https://geiserx.github.io/radares-anunciados-ha/status.json"
@@ -80,6 +80,27 @@ def main():
     (raw_dir / "feed.geojson").write_text(json.dumps(feed, ensure_ascii=False), encoding="utf-8")
     (raw_dir / "status.json").write_text(json.dumps(status, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    # Leer el GeoJSON anterior + todos los históricos para no perder nada nunca
+    name = "radares-pais-vasco-navarra-aragon.geojson"
+    previous = []
+    previous_path = processed_dir / name
+    if previous_path.exists():
+        try:
+            previous = json.loads(previous_path.read_text(encoding="utf-8")).get("features", [])
+        except (ValueError, OSError) as e:
+            print(f"Aviso: no se pudo leer el GeoJSON anterior: {e}")
+    # Añadir todo lo de snapshots históricos (data/history/*/processed/...)
+    history_dir = root / "data" / "history"
+    if history_dir.exists():
+        for snap in sorted(history_dir.iterdir()):
+            snap_file = snap / "processed" / name
+            if snap_file.exists():
+                try:
+                    snap_feats = json.loads(snap_file.read_text(encoding="utf-8")).get("features", [])
+                    previous.extend(snap_feats)
+                except (ValueError, OSError):
+                    pass
+    
     # Filtrar
     features_in = feed.get("features", [])
     features_out = []
@@ -88,6 +109,12 @@ def main():
         geom = f.get("geometry")
         if is_in_target_region(props, geom):
             features_out.append(f)
+    
+    conservadas = len(features_out)
+    features_out = merge_preserved_features(features_out, previous)
+    preservadas = len(features_out) - conservadas
+    if preservadas:
+        print(f"Conservadas {preservadas} localizaciones históricas (no en feed actual).")
 
     out = {
         "type": "FeatureCollection",
@@ -100,7 +127,7 @@ def main():
         "features": features_out,
     }
 
-    processed, published = write_geojson("radares-pais-vasco-navarra-aragon.geojson", out)
+    processed, published = write_geojson(name, out)
     print(f"Guardado: {processed} ({len(features_out)} features)")
     print(f"Publicado: {published}")
 

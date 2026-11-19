@@ -27,14 +27,14 @@ export const CATEGORIES = [
   {
     id: "fijos",
     label: "Fijos",
-    description: "Cabinas, radares permanentes y tramos de velocidad",
+    description: "Cabinas y radares permanentes",
     colorHint: "rojo",
     Icon: BroadcastIcon,
   },
   {
     id: "moviles",
     label: "Móviles",
-    description: "Radares móviles anunciados",
+    description: "Radares móviles anunciados y tramos INVIVE",
     colorHint: "naranja",
     Icon: MobileRadarIcon,
   },
@@ -64,32 +64,8 @@ export const INCIDENT_CATEGORY = {
 
 export const ALL_CATEGORIES = [...CATEGORIES, INCIDENT_CATEGORY];
 
-/**
- * Clasifica un elemento según su tipo, sin importar la fuente.
- * Los tramos (INVIVE, section, stretch) van con los fijos.
- */
-export function getCategory(feature) {
-  const props = feature?.properties || {};
-  const source = props.source || "";
-  const kind = props.kind || "";
-
-  if ((source === "navarra" || source === "euskadi") && props.title) return "incidencias";
-  if (source === "vitoria_foto_rojo" || kind === "photo_red" || kind === "traffic_light") {
-    return "semaforos";
-  }
-  if (
-    kind === "mobile_location" ||
-    kind === "mobile_announced" ||
-    kind === "mobile_recurring" ||
-    source === "vitoria_ayto" ||
-    source === "vitoria_ayto_movil" ||
-    source === "donostia_movil"
-  ) {
-    return "moviles";
-  }
-  if (source === "osm" || source === "osm_notes") return "posibles";
-  return "fijos";
-}
+// La lógica de clasificación vive en un módulo puro para poder testearla.
+export { getCategory } from "./categories.js";
 
 /** Icono SVG reutilizado en el mapa para cada categoría. */
 export function makeCategoryIcon(category) {

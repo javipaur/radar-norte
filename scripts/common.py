@@ -7,6 +7,7 @@ Garantiza dos cosas:
      que es lo que realmente sirve Vite (antes se copiaba solo a veces).
 """
 import csv
+import hashlib
 import json
 import math
 import shutil
@@ -36,6 +37,40 @@ def validate_collection(obj, name, min_features=1):
     return obj
 
 
+def merge_preserved_features(new_features, previous_features):
+    """Conserva localizaciones ya guardadas que la fuente remota ya no incluye.
+
+    Se empareja por `id` cuando existe; si no, por una clave estable de
+    propiedades + geometría. Las features nuevas ganan sobre las antiguas, pero
+    una retirada en la fuente nunca borra una localización que ya teníamos.
+    Las conservadas se marcan como historical=True.
+    """
+    def key(feature):
+        if feature.get("id") is not None:
+            return ("id", str(feature["id"]))
+        stable = json.dumps(
+            {"properties": feature.get("properties", {}), "geometry": feature.get("geometry")},
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        return ("content", stable)
+
+    merged = list(new_features)
+    seen = {key(f) for f in merged}
+    for feature in previous_features or []:
+        identity = key(feature)
+        if identity not in seen:
+            # marcar como histórico (conservado)
+            fcopy = json.loads(json.dumps(feature, ensure_ascii=False))
+            props = fcopy.get("properties") or {}
+            props["historical"] = True
+            props["historical_note"] = "Conservado: ya no aparece en la fuente actual (histórico)."
+            fcopy["properties"] = props
+            merged.append(fcopy)
+            seen.add(identity)
+    return merged
+
+
 def write_geojson(name, obj):
     """Valida, escribe en data/processed y publica en public/data/processed."""
     validate_collection(obj, name)
@@ -60,6 +95,12 @@ def sync_processed_to_public(processed=PROCESSED_DIR, public=PUBLIC_DIR):
     return copied
 
 
+def navarra_id(titulo, ubicacion, fecha, carretera, pk, tipo):
+    """Id estable de una incidencia de Navarra (independiente de su 'updated')."""
+    identidad = "|".join(str(x or "") for x in (titulo, ubicacion, fecha, carretera, pk, tipo))
+    return "navarra-" + hashlib.sha1(identidad.encode("utf-8")).hexdigest()[:16]
+
+
 def parse_navarra_csv(content, transformer):
     """Convierte el CSV oficial de Navarra a features GeoJSON (WGS84).
 
@@ -76,8 +117,16 @@ def parse_navarra_csv(content, transformer):
             lon, lat = transformer(x, y)
             if not (math.isfinite(lon) and math.isfinite(lat)):
                 continue
+            # No incluye `Ultima_actualizacion` ni `Otros_datos`: cambian sin que
+            # la incidencia sea otra. Así se conserva una localización retirada
+            # del CSV sin duplicar la que sigue activa.
+            feature_id = navarra_id(
+                row.get("Titulo"), row.get("Ubicacion"), row.get("Fecha_incidencia"),
+                row.get("Carretera"), row.get("PK"), row.get("Tipo"),
+            )
             features.append({
                 "type": "Feature",
+                "id": feature_id,
                 "geometry": {"type": "Point", "coordinates": [lon, lat]},
                 "properties": {
                     "source": "navarra",
