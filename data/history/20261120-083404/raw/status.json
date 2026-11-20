@@ -1,0 +1,281 @@
+{
+  "generated": "2026-11-19T20:51:12+00:00",
+  "features": 4710,
+  "reported": 44,
+  "sources": [
+    {
+      "source": "dgt",
+      "status": "ok",
+      "radars": 784,
+      "stretches": 47,
+      "reported": 0,
+      "in_feed": 783,
+      "data_time": "2026-11-19T20:44:16+00:00",
+      "updated": "2025-12-18",
+      "error": "",
+      "attribution": "Dirección General de Tráfico (CC BY 4.0)",
+      "licence": "CC BY 4.0",
+      "spanish_ip": false
+    },
+    {
+      "source": "osm",
+      "status": "ok",
+      "radars": 2841,
+      "stretches": 312,
+      "reported": 0,
+      "in_feed": 1727,
+      "data_time": "2026-11-19T20:44:17+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "© OpenStreetMap contributors (ODbL 1.0)",
+      "licence": "ODbL 1.0",
+      "spanish_ip": false
+    },
+    {
+      "source": "osm_notes",
+      "status": "ok",
+      "radars": 0,
+      "stretches": 0,
+      "reported": 44,
+      "in_feed": 44,
+      "data_time": "2026-11-19T20:46:11+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "© OpenStreetMap contributors (ODbL 1.0)",
+      "licence": "ODbL 1.0",
+      "spanish_ip": false
+    },
+    {
+      "source": "murcia",
+      "status": "ok",
+      "radars": 38,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 155,
+      "data_time": "2026-11-19T20:46:13+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "Policía Local de Murcia (lista semanal, leída en la prensa local); geometría © OpenStreetMap y CartoCiudad, CC BY 4.0 scne.es (© Instituto Geográfico Nacional)",
+      "licence": "the Policía Local's weekly list, which it posts on its social networks as an image; the feed reads it in the press and takes its facts (street, district, week), not the article's text. Geometry: ODbL 1.0; a street OpenStreetMap misses, CartoCiudad (IGN), CC BY 4.0",
+      "spanish_ip": false,
+      "streets": {
+        "announced": 9,
+        "placed": 9,
+        "by_method": {
+          "cartociudad": 1,
+          "osm": 8
+        },
+        "unplaced": []
+      }
+    },
+    {
+      "source": "sct",
+      "status": "ok",
+      "radars": 230,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 230,
+      "data_time": "2026-11-19T20:47:41+00:00",
+      "updated": "2026-09-17",
+      "error": "",
+      "attribution": "Generalitat de Catalunya. Departament d'Interior i Seguretat Pública. Servei Català de Trànsit (Llicència oberta d'ús d'informació – Catalunya)",
+      "licence": "Llicència oberta d'ús d'informació – Catalunya",
+      "spanish_ip": false
+    },
+    {
+      "source": "sct_remolc",
+      "status": "ok",
+      "radars": 53,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 53,
+      "data_time": "2026-11-19T20:47:41+00:00",
+      "updated": "2025-11-27",
+      "error": "",
+      "attribution": "Generalitat de Catalunya. Departament d'Interior i Seguretat Pública. Servei Català de Trànsit (Llicència oberta d'ús d'informació – Catalunya)",
+      "licence": "Llicència oberta d'ús d'informació – Catalunya",
+      "spanish_ip": false
+    },
+    {
+      "source": "dgt_invive",
+      "status": "ok",
+      "radars": 0,
+      "stretches": 1325,
+      "reported": 0,
+      "in_feed": 1325,
+      "data_time": "2026-11-19T20:47:41+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "Dirección General de Tráfico (Creative Commons Attribution)",
+      "licence": "Creative Commons Attribution (as stated on the NAP dataset page, no version given); terms of use https://www.dgt.es/contenido/aviso-legal/",
+      "spanish_ip": false
+    },
+    {
+      "source": "euskadi",
+      "status": "ok",
+      "radars": 97,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 97,
+      "data_time": "2026-11-19T20:47:42+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "Gobierno Vasco / Eusko Jaurlaritza, Dirección de Tráfico (Trafikoa)",
+      "licence": "no reuse licence; the data is reused under Ley 37/2007 on the reuse of public-sector information. Its legal notice reserves the site's content: https://www.euskadi.eus/informacion/-/informacion-legal",
+      "spanish_ip": true
+    },
+    {
+      "source": "navarra",
+      "status": "ok",
+      "radars": 1,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 1,
+      "data_time": "2026-11-19T20:47:42+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "Gobierno de Navarra, Visor de Tráfico",
+      "licence": "no reuse licence; the data is reused under Ley 37/2007 on the reuse of public-sector information. Its legal notice reserves the site's content: https://www.navarra.es/es/aviso-legal",
+      "spanish_ip": true
+    },
+    {
+      "source": "donostia",
+      "status": "ok",
+      "radars": 12,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 12,
+      "data_time": "2026-11-19T20:47:42+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "© Donostiako Udala - Ayuntamiento de Donostia / San Sebastián",
+      "licence": "the council's reuse terms: content kept whole, source cited, no unlawful use (Ley 37/2007); third-party content excluded. Legal notice: https://www.donostia.eus/es/aviso-legal",
+      "spanish_ip": false
+    },
+    {
+      "source": "donostia_movil",
+      "status": "ok",
+      "radars": 15,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 26,
+      "data_time": "2026-11-19T20:47:43+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "Ayuntamiento de Donostia / San Sebastián, ubicación del radar móvil; geometría de una calle sin línea: CartoCiudad, CC BY 4.0 scne.es (© Instituto Geográfico Nacional), © OpenStreetMap",
+      "licence": "the council's reuse terms: content kept whole, source cited, no unlawful use (Ley 37/2007); third-party content excluded. Legal notice: https://www.donostia.eus/es/aviso-legal. A street the council gives no line for: CartoCiudad (IGN), CC BY 4.0, or OpenStreetMap, ODbL 1.0",
+      "spanish_ip": false,
+      "streets": {
+        "announced": 6,
+        "placed": 6,
+        "by_method": {
+          "council": 6
+        },
+        "unplaced": []
+      }
+    },
+    {
+      "source": "madrid",
+      "status": "ok",
+      "radars": 26,
+      "stretches": 9,
+      "reported": 0,
+      "in_feed": 35,
+      "data_time": "2026-11-19T20:47:43+00:00",
+      "updated": "2026-10-22",
+      "error": "",
+      "attribution": "Origen de los datos: Ayuntamiento de Madrid (CC BY 4.0)",
+      "licence": "CC BY 4.0",
+      "spanish_ip": false
+    },
+    {
+      "source": "salamanca",
+      "status": "ok",
+      "radars": 28,
+      "stretches": 4,
+      "reported": 0,
+      "in_feed": 28,
+      "data_time": "2026-11-19T20:47:47+00:00",
+      "updated": "2025-01-22",
+      "error": "",
+      "attribution": "Ayuntamiento de Salamanca, Radares Municipales (GNU Free Documentation License)",
+      "licence": "GNU Free Documentation License (as the dataset states it); the portal's terms add Ley 37/2007 art. 8: data unaltered, source cited, date of last update given",
+      "spanish_ip": false
+    },
+    {
+      "source": "leon",
+      "status": "ok",
+      "radars": 191,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 161,
+      "data_time": "2026-11-19T20:47:48+00:00",
+      "updated": null,
+      "error": "",
+      "attribution": "Ayuntamiento de León (ubicación mensual de los radares móviles); Redacción ILEÓN, obtenido de ILEÓN (ileon.eldiario.es); geometría © OpenStreetMap y CartoCiudad, CC BY 4.0 scne.es (© Instituto Geográfico Nacional)",
+      "licence": "Ayuntamiento de León's posts: no reuse licence; the data is reused under Ley 37/2007 on the reuse of public-sector information; its portal's terms reserve reproduction except for personal and private use (https://www.aytoleon.es/es/inicio/Paginas/terminos-y-condiciones-generales.aspx). Days only iLeón covers: the facts iLeón reports (street, day, limit), not its text, which is CC BY-NC 4.0. Geometry: ODbL 1.0; a street OpenStreetMap misses, CartoCiudad (IGN), CC BY 4.0",
+      "spanish_ip": true,
+      "streets": {
+        "announced": 33,
+        "placed": 31,
+        "by_method": {
+          "osm": 30,
+          "osm_fuzzy": 1
+        },
+        "unplaced": [
+          "P.º Salamanca",
+          "P.º Condesa"
+        ]
+      }
+    },
+    {
+      "source": "barcelona_multas",
+      "status": "ok",
+      "radars": 13,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 9,
+      "data_time": "2026-11-19T20:48:31+00:00",
+      "updated": "2026-09-01",
+      "error": "",
+      "attribution": "Fuente de los datos: Ayuntamiento de Barcelona (CC BY 4.0), detalle de las denuncias y sanciones de tráfico",
+      "licence": "CC BY 4.0",
+      "spanish_ip": false
+    },
+    {
+      "source": "madrid_multas",
+      "status": "ok",
+      "radars": 27,
+      "stretches": 0,
+      "reported": 0,
+      "in_feed": 24,
+      "data_time": "2026-11-19T20:48:34+00:00",
+      "updated": "2026-10-20",
+      "error": "",
+      "attribution": "Origen de los datos: Ayuntamiento de Madrid (CC BY 4.0): multas de circulación (detalle) y callejero oficial",
+      "licence": "CC BY 4.0",
+      "spanish_ip": false
+    }
+  ],
+  "roads": {
+    "file": "roads.json",
+    "status": "ok",
+    "generated": "2026-11-19T20:51:12+00:00",
+    "osm_date": "2026-11-15",
+    "bbox": [
+      -9.779014,
+      35.154153,
+      5.098525,
+      44.14855
+    ],
+    "stretches_in_bbox": 1519,
+    "stretches_followed": 1312,
+    "stretches_with_gates": 1268,
+    "points_in_bbox": 2314,
+    "points_with_approaches": 2237,
+    "points_with_bearing": 1439,
+    "points_high_confidence": 228,
+    "bytes": 809771,
+    "error": ""
+  }
+}

@@ -1,42 +1,27 @@
 import {
   BroadcastIcon,
   CarIcon,
-  QuestionIcon,
   TrafficSignalIcon,
+  WarningCircleIcon,
   WarningIcon,
 } from "@phosphor-icons/react";
-import { divIcon } from "leaflet";
-import { renderToStaticMarkup } from "react-dom/server";
 
-// "Coche con radar": el coche de Phosphor + unas ondas de radar en la esquina.
-function MobileRadarIcon({ size = 24, ...rest }) {
-  return (
-    <span className="rn-combo-icon">
-      <CarIcon size={size} {...rest} />
-      <BroadcastIcon
-        className="rn-combo-waves"
-        size={Math.max(8, Math.round(size * 0.5))}
-        {...rest}
-      />
-    </span>
-  );
-}
-
-// Fijos: ondas concéntricas con centro, el equivalente a un icono de radar.
+// Cada categoría usa un icono Phosphor "fill" sobre un badge redondeado del
+// color del marcador, tal como en el mockup v5 aprobado (estilo "Phosphor fill").
 export const CATEGORIES = [
   {
     id: "fijos",
     label: "Fijos",
-    description: "Cabinas y radares permanentes",
+    description: "Cabinas, radares permanentes y tramos de velocidad",
     colorHint: "rojo",
     Icon: BroadcastIcon,
   },
   {
     id: "moviles",
     label: "Móviles",
-    description: "Radares móviles anunciados y tramos INVIVE",
+    description: "Radares móviles anunciados",
     colorHint: "naranja",
-    Icon: MobileRadarIcon,
+    Icon: CarIcon,
   },
   {
     id: "semaforos",
@@ -50,7 +35,7 @@ export const CATEGORIES = [
     label: "Posibles",
     description: "Puntos detectados en OSM, sin verificar",
     colorHint: "gris",
-    Icon: QuestionIcon,
+    Icon: WarningCircleIcon,
   },
 ];
 
@@ -66,17 +51,3 @@ export const ALL_CATEGORIES = [...CATEGORIES, INCIDENT_CATEGORY];
 
 // La lógica de clasificación vive en un módulo puro para poder testearla.
 export { getCategory } from "./categories.js";
-
-/** Icono SVG reutilizado en el mapa para cada categoría. */
-export function makeCategoryIcon(category) {
-  const Icon = category.Icon;
-  return divIcon({
-    className: "rn-marker-wrapper",
-    html: `<span class="rn-marker rn-marker--${category.id}">${renderToStaticMarkup(
-      <Icon size={20} weight="fill" color="currentColor" />
-    )}</span>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
-    popupAnchor: [0, -14],
-  });
-}

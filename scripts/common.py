@@ -64,7 +64,11 @@ def merge_preserved_features(new_features, previous_features):
             fcopy = json.loads(json.dumps(feature, ensure_ascii=False))
             props = fcopy.get("properties") or {}
             props["historical"] = True
-            props["historical_note"] = "Conservado: ya no aparece en la fuente actual (histórico)."
+            # Si la entrada ya explica por qué se conserva (p. ej. la semilla
+            # del radar móvil de Uharte Arakil), esa nota es más valiosa que el
+            # texto genérico: no la sobrescribamos en cada actualización.
+            if not props.get("historical_note"):
+                props["historical_note"] = "Conservado: ya no aparece en la fuente actual (histórico)."
             fcopy["properties"] = props
             merged.append(fcopy)
             seen.add(identity)

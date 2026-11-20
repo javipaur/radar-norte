@@ -8,6 +8,7 @@
 export const RAW_SOURCES = [
   { id: "dgt", label: "DGT · fijos", color: "#e53935" },
   { id: "dgt_invive", label: "DGT · INVIVE (móviles)", color: "#fb8c00" },
+  { id: "historico_movil", label: "Histórico · móviles no certificados", color: "#fb8c00" },
   { id: "navarra", label: "Navarra · radares", color: "#1976d2" },
   { id: "euskadi", label: "Euskadi · radares", color: "#2e7d32" },
   { id: "osm", label: "OSM · radares", color: "#8e24aa" },
@@ -59,6 +60,9 @@ const NAVARRA_BBOX = { minLon: -2.35, maxLon: -1.2, minLat: 41.75, maxLat: 43.3 
 export function isInNavarraScope(feature) {
   const props = feature?.properties || {};
   if (String(props.province) === "31") return true;
+  // El CSV oficial de Navarra no incluye código de provincia: todo el fichero
+  // es de Navarra. Sin esto, «Solo Navarra» oculta sus 30 incidencias.
+  if (props.__dataset === "incidencias-navarra") return true;
   if (props.source !== "osm" && props.source !== "osm_notes") return false;
 
   const geom = feature?.geometry || {};

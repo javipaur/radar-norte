@@ -8,6 +8,11 @@
  * Los tramos INVIVE de "Tramo de radar móvil" son radares móviles anunciados,
  * no cabinas fijas.
  */
+export function isHistoricalMobile(feature) {
+  const props = feature?.properties || {};
+  return props.source === "historico_movil" && props.historical === true;
+}
+
 export function getCategory(feature) {
   const props = feature?.properties || {};
   const source = props.source || "";

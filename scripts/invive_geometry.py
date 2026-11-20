@@ -35,6 +35,16 @@ def haversine_km(a, b):
     return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(h))
 
 
+def path_length_km(coords):
+    """Longitud total de una polilínea [lon, lat], en km."""
+    if not coords or len(coords) < 2:
+        return 0.0
+    return sum(
+        haversine_km((a[1], a[0]), (b[1], b[0]))
+        for a, b in zip(coords, coords[1:])
+    )
+
+
 def build_road_graph(ways):
     """Grafo no dirigido de los ways de Overpass (campo `geometry`)."""
     nodes = {}
@@ -55,6 +65,11 @@ def build_road_graph(ways):
     # Un mismo `ref` puede tener trozos sueltos. Saber qué nodos están conectados
     # permite probar un candidato de snap por componente en vez de los N nodos
     # más cercanos (que pueden pertenecer todos a un trozo aislado).
+    return {"nodes": nodes, "adj": adj, "component": _components(adj)}
+
+
+def _components(adj):
+    """Etiqueta el componente conexo de cada nodo del grafo."""
     component = {}
     for index, node in enumerate(adj):
         if node in component:
@@ -67,7 +82,56 @@ def build_road_graph(ways):
                 if neighbor not in component:
                     component[neighbor] = index
                     pending.append(neighbor)
-    return {"nodes": nodes, "adj": adj, "component": component}
+    return component
+
+
+def connect_nearby_components(graph, max_gap_km=0.5):
+    """Une trozos sueltos de la misma vía separados por un hueco corto.
+
+    Los ways de OSM con el mismo `ref` no siempre comparten nodos: hay trozos
+    partidos por una obra, un cambio de denominación o un error de importación.
+    Si el hueco es pequeño, unirlos con una arista del tamaño real del hueco
+    permite trazar el tramo completo en vez de dibujar una recta. Devuelve un
+    grafo nuevo; el original queda intacto.
+    """
+    nodes = graph.get("nodes") or {}
+    if max_gap_km <= 0 or not nodes:
+        return graph
+
+    adj = {key: list(neighbors) for key, neighbors in graph.get("adj", {}).items()}
+    # Solo se unen trozos SUELTOS (componentes distintos). Puentear nodos que
+    # ya están conectados crea atajos: Dijkstra recorta las curvas y la línea
+    # dibujada se sale de la carretera (caso real: NA-2410 en Uharte Arakil).
+    component = graph.get("component") or _components(adj)
+    lat0 = sum(coord[0] for coord in nodes.values()) / len(nodes)
+    km_por_lat = 110.57
+    km_por_lon = max(111.32 * math.cos(math.radians(lat0)), 1e-6)
+    tam_celda = max(max_gap_km / km_por_lat, max_gap_km / km_por_lon)
+
+    celdas = {}
+    for key, coord in nodes.items():
+        celda = (math.floor(coord[0] / tam_celda), math.floor(coord[1] / tam_celda))
+        celdas.setdefault(celda, []).append(key)
+
+    for celda, keys in celdas.items():
+        x, y = celda
+        vecinas = []
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                vecinas.extend(celdas.get((x + dx, y + dy), ()))
+        for key in keys:
+            for other in vecinas:
+                if other <= key:
+                    continue  # cada par se evalúa una sola vez
+                if component.get(key) == component.get(other):
+                    continue  # ya hay carretera entre ellos: sería un atajo
+                distancia = haversine_km(nodes[key], nodes[other])
+                if distancia > max_gap_km:
+                    continue
+                adj[key].append((other, distancia))
+                adj[other].append((key, distancia))
+
+    return {"nodes": nodes, "adj": adj, "component": _components(adj)}
 
 
 def _nearest_nodes(graph, lonlat, limit=8):
@@ -119,6 +183,8 @@ def _dijkstra(graph, start):
 
 def _dressed_path(graph, start, end, previous, start_lonlat, end_lonlat):
     """Cadena de nodos convertida a [lon, lat] con los extremos DGT exactos."""
+    if start == end:
+        return [[start_lonlat[0], start_lonlat[1]], [end_lonlat[0], end_lonlat[1]]]
     chain = [end]
     while chain[-1] != start:
         chain.append(previous[chain[-1]])
@@ -145,20 +211,26 @@ def trace_road_path(graph, start_lonlat, end_lonlat, max_snap_km=1.0):
     if not graph["nodes"]:
         return None
 
-    starts = [key for distance, key in _snap_candidates(graph, start_lonlat) if distance <= max_snap_km]
-    ends = [key for distance, key in _snap_candidates(graph, end_lonlat) if distance <= max_snap_km]
+    starts = [(d, key) for d, key in _snap_candidates(graph, start_lonlat) if d <= max_snap_km]
+    ends = [(d, key) for d, key in _snap_candidates(graph, end_lonlat) if d <= max_snap_km]
     if not starts or not ends:
         return None
 
-    end_set = set(ends)
-    for start in starts:
+    end_snap = {key: distance for distance, key in ends}
+    mejor = None  # (coste, start, end, previous)
+    for start_snap, start in starts:
         best, previous = _dijkstra(graph, start)
-        reachable = [end for end in ends if end in best]
-        if not reachable:
-            continue
-        end = min(reachable, key=lambda key: best[key])
-        return _dressed_path(graph, start, end, previous, start_lonlat, end_lonlat)
-    return None
+        for end, end_snap_km in end_snap.items():
+            if start == end or end not in best:
+                continue  # el mismo nodo no da un tramo; mejor conservar la recta DGT
+            # Con snap amplio importa también lo lejos que cae cada extremo.
+            coste = best[end] + start_snap + end_snap_km
+            if mejor is None or coste < mejor[0]:
+                mejor = (coste, start, end, previous)
+    if mejor is None:
+        return None
+    _, start, end, previous = mejor
+    return _dressed_path(graph, start, end, previous, start_lonlat, end_lonlat)
 
 
 def _perp_distance_km(point, a, b, lat0):

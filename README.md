@@ -28,6 +28,20 @@ npm run preview
 ```
 Salida en `dist/`.
 
+## Despliegue en Dokploy (GitHub + Nixpacks)
+
+La app es **estática**: se compila con Vite y se sirve con Caddy. El repositorio incluye `nixpacks.toml` y `engines.node` en `package.json` para fijar **Node 22** (Vite 8 requiere Node ≥ 20.19; el valor por defecto de Nixpacks es Node 18 y hace fallar el build). Nixpacks detecta automáticamente el build (`npm ci` + `npm run build`) y el arranque con Caddy sirviendo `dist/`.
+
+Pasos en Dokploy:
+
+1. Crea una nueva **Application** y conecta el repositorio `https://github.com/javipaur/radar-norte.git`, rama `main`.
+2. En **Build**, selecciona **Nixpacks** como *Build Type*.
+3. Si Dokploy te pide un *Publish Directory* / *Output Directory*, indícalo: `dist`.
+4. No hace falta configurar variables de entorno ni un puerto especial: Nixpacks detecta Vite, genera `dist/` y lo sirve con Caddy en el puerto 80.
+5. Configura el dominio (o usa el que genera Dokploy) y despliega.
+
+> Si vuelves a ver el error `The requested module 'node:util' does not provide an export named 'styleText'`, significa que el build está usando Node 18: comprueba que `package.json` tiene `"engines": { "node": ">=22.12.0" }`, que `nixpacks.toml` está en la raíz del repo y que Dokploy está desplegando la rama `main` con esos cambios ya pusheados.
+
 ## Fuentes de datos y licencias (resumen)
 - **Radares Anunciados** (feed agregado): https://geiserx.github.io/radares-anunciados-ha/  
   Incluye datos de DGT, gobiernos autonómicos, ayuntamientos y OpenStreetMap. Licencia del feed: **ODbL 1.0** (incluye OSM). Datos de organismos públicos: reutilización según **Ley 37/2007** (citar fuente, no alterar valores).

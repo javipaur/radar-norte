@@ -2,6 +2,7 @@
  * Utilidades puras para unir las fuentes SIN perder información.
  * No importan React ni Leaflet: se pueden probar con `node --test`.
  */
+import { isHistoricalMobile } from "./categories.js";
 
 // Mismos colores que .legend-badge--* / .rn-marker--* en App.css.
 export const CATEGORY_COLORS = {
@@ -46,6 +47,15 @@ const LABELS = {
   notes: "Notas",
   kind: "Tipo de dato",
   active: "Activo",
+  certified: "Certificado",
+  historical: "Histórico",
+  first_seen: "Visto en",
+  historical_note: "Nota histórica",
+  geometry_source: "Origen de la geometría",
+  dgt_extremos: "Extremos publicados por la DGT",
+  straight_length_km: "Distancia en recta (km)",
+  traced_length_km: "Longitud por carretera (km)",
+  trace_tolerance_m: "Tolerancia del trazado (m)",
   valid_from: "Válido desde",
   valid_to: "Válido hasta",
   province: "Provincia",
@@ -181,6 +191,18 @@ export function featurePaths(feature) {
     return geom.coordinates.map((line) => line.map(([lon, lat]) => [lat, lon]));
   }
   return null;
+}
+
+/**
+ * Orden de pintado en el mapa: las zonas móviles históricas van AL FINAL.
+ * Leaflet con SVG pinta en orden de DOM; lo último queda encima y es lo que
+ * recibe el clic. En el cruce de Uharte Arakil hay decenas de marcadores
+ * apiñados, así que sin esto el punto conservado queda invisible e inplaceable.
+ * Devuelve una copia: no altera el orden de los datos ni los filtros.
+ */
+export function sortForRender(features) {
+  const list = [...(features || [])];
+  return list.sort((a, b) => Number(isHistoricalMobile(a)) - Number(isHistoricalMobile(b)));
 }
 
 /** Bounds de Leaflet [[sur, oeste], [norte, este]] con puntos y tramos. */

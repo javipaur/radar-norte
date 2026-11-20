@@ -19,14 +19,31 @@ import urllib.request
 from datetime import datetime, timezone
 
 from common import PROCESSED_DIR, RAW_DIR, write_geojson
-from invive_geometry import build_road_graph, is_plausible_trace, simplify_path, trace_road_path
+from invive_geometry import (
+    build_road_graph,
+    connect_nearby_components,
+    is_plausible_trace,
+    path_length_km,
+    simplify_path,
+    trace_road_path,
+)
 
 RADAR_NAME = "radares-pais-vasco-navarra-aragon.geojson"
 CACHE_NAME = "invive-osm-ways.json"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 CHUNK_SIZE = 15
-SIMPLIFY_KM = 0.03
-MAX_SNAP_KM = 2.0
+# 10 m en vez de 30 m: la línea debe ceñirse al trazado OSM (NA-2410 pasa por
+# Uharte Arakil). El coste es solo unos pocos vértices más por tramo.
+SIMPLIFY_KM = 0.01
+# Los trozos sueltos del mismo `ref` se unen si el hueco es corto (obras,
+# cambios de denominación, errores de importación en OSM).
+BRIDGE_KM = 1.5
+# Algunos extremos DGT caen a 2-5 km de la vía: con 2 km esos tramos quedaban
+# como recta. Se amplía el snap y se valida el resultado con el ratio de rodeo.
+MAX_SNAP_KM = 5.0
+# 3,5x y no 2x: hay curvas reales ya trazadas (NA-2310) con ratio ~3 que no
+# hay que convertir en rectas. Sí se rechazan saltos de decenas de km.
+MAX_RATIO = 3.5
 
 
 def _fetch_ways(refs, bbox):
@@ -117,12 +134,17 @@ def main():
         cache["updated_at"] = datetime.now(timezone.utc).isoformat()
         _save_cache(cache)
 
-    graphs = {ref: build_road_graph(ways_by_ref.get(ref, [])) for ref in refs}
+    graphs = {
+        ref: connect_nearby_components(
+            build_road_graph(ways_by_ref.get(ref, [])), BRIDGE_KM
+        )
+        for ref in refs
+    }
     trazados = 0
     rechazados_desvio = 0
     # La recta DGT une solo los extremos; una carretera real puede curvarse lejos
-    # de ella. Solo se rechaza un trazado si rodea >2x la distancia en recta,
-    # que es lo que delata un salto a un trozo de vía desconectado.
+    # de ella. Solo se rechaza un trazado si rodea demasiado la distancia en
+    # recta, que es lo que delata un salto a un trozo de vía desconectado.
     for feature in invive:
         props = feature["properties"]
         extremos = [list(p) for p in (props.get("dgt_extremos") or feature["geometry"]["coordinates"])]
@@ -136,15 +158,27 @@ def main():
             extremos[-1],
             max_snap_km=MAX_SNAP_KM,
         )
-        if path and len(path) >= 2:
+        props["straight_length_km"] = round(path_length_km([extremos[0], extremos[-1]]), 3)
+        if path and len(path) >= 2 and is_plausible_trace(path, extremos[0], extremos[-1], MAX_RATIO):
             feature["geometry"]["coordinates"] = simplify_path(path, SIMPLIFY_KM)
             props["geometry_source"] = "osm_road_trace"
+            props["traced_length_km"] = round(
+                path_length_km(feature["geometry"]["coordinates"]), 3
+            )
+            props["trace_tolerance_m"] = int(SIMPLIFY_KM * 1000)
             trazados += 1
         else:
+            if path:
+                rechazados_desvio += 1
             props["geometry_source"] = "dgt_extremos"
+            props["traced_length_km"] = props["straight_length_km"]
 
     write_geojson(RADAR_NAME, collection)
-    print(f"Tramos INVIVE: {len(invive)} · trazados por carretera (OSM): {trazados} · sin trazado (recta DGT): {len(invive) - trazados}")
+    print(
+        f"Tramos INVIVE: {len(invive)} · trazados por carretera (OSM): {trazados} · "
+        f"sin trazado (recta DGT): {len(invive) - trazados} "
+        f"(descartados por rodeo: {rechazados_desvio})"
+    )
     return 0
 
 

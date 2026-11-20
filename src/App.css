@@ -66,6 +66,159 @@ header .version {
   outline-offset: 2px;
 }
 
+/* Leyenda de categorías (diseño v5 · estilo "Phosphor fill") */
+.cat-legend {
+  flex: 0 0 auto;
+  background: #fff;
+  padding: 0.7rem 1rem 0.85rem;
+  border-bottom: 1px solid #ddd;
+}
+.cat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+.cat-title {
+  font-size: 0.92rem;
+  font-weight: 750;
+}
+.cat-pill {
+  font-size: 0.62rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #e7f4ea;
+  color: #1a5f2a;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cat-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.5rem;
+}
+.cat-row {
+  --cat-color: #555;
+  --cat-tint: rgba(120, 120, 120, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  min-height: 62px;
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid #e4e8ea;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--cat-tint), rgba(255, 255, 255, 0));
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.cat-row:hover {
+  border-color: var(--cat-color);
+}
+.cat-row:active {
+  transform: scale(0.99);
+}
+.cat-row[aria-pressed="true"] {
+  border-color: var(--cat-color);
+  box-shadow: inset 0 0 0 2px var(--cat-color);
+}
+.cat-row--fijos {
+  --cat-color: #e53935;
+  --cat-tint: rgba(229, 57, 53, 0.14);
+}
+.cat-row--moviles {
+  --cat-color: #fb8c00;
+  --cat-tint: rgba(251, 140, 0, 0.16);
+}
+.cat-row--semaforos {
+  --cat-color: #6a1b9a;
+  --cat-tint: rgba(21, 101, 192, 0.13);
+}
+.cat-row--posibles {
+  --cat-color: #9e9e9e;
+  --cat-tint: rgba(158, 158, 158, 0.16);
+}
+.cat-row--incidencias {
+  --cat-color: #b71c1c;
+  --cat-tint: rgba(183, 28, 28, 0.1);
+}
+.cat-ico {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--cat-color);
+}
+.cat-row--semaforos .cat-ico {
+  background: linear-gradient(135deg, #1565c0, #6a1b9a);
+}
+.cat-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cat-name {
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+.cat-sub {
+  font-size: 0.7rem;
+  color: #596268;
+  margin-top: 3px;
+  line-height: 1.35;
+}
+.cat-count {
+  margin-left: auto;
+  padding-left: 0.5rem;
+  font-size: 0.63rem;
+  color: #6b7378;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+.cat-apart {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #d3dadb;
+}
+.cat-label {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  font-weight: 750;
+  margin-bottom: 0.5rem;
+}
+.cat-reset {
+  margin-top: 0.7rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid #1a5f2a;
+  border-radius: 6px;
+  background: #eaf5ee;
+  color: #1a5f2a;
+  cursor: pointer;
+}
+.cat-reset:hover {
+  background: #dceee2;
+}
+.cat-row:focus-visible,
+.cat-reset:focus-visible,
+.legend-toggle:focus-visible {
+  outline: 3px solid #1a5f2a;
+  outline-offset: 2px;
+}
+
 /* Leyenda interactiva */
 .legend {
   background: #fff;
@@ -251,6 +404,15 @@ header .version {
   line-height: 1.25;
   margin-bottom: 0.45rem;
 }
+.rn-popup-note {
+  margin: 0 0 0.55rem;
+  padding: 0.45rem 0.55rem;
+  border-left: 3px solid #fb8c00;
+  background: #fff7e6;
+  color: #6d4c00;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
 .rn-popup-grid {
   margin: 0;
   display: grid;
@@ -280,11 +442,35 @@ header .version {
   margin: 10px 12px;
 }
 
+.legend-toggle {
+  margin-left: auto;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.72rem;
+  border: 1px solid #cdd8d0;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  color: #1a5f2a;
+}
+.legend-toggle:hover {
+  background: #edf5ef;
+}
+.legend-collapsed .legend-help,
+.legend-collapsed .legend-list {
+  display: none;
+}
+
 @media (max-width: 600px) {
-  .legend-list {
+  .legend-list,
+  .cat-list {
     grid-template-columns: 1fr;
   }
-  .legend-hint {
+  .legend-hint,
+  .cat-count {
     display: none;
+  }
+  .cat-legend {
+    max-height: 46vh;
+    overflow-y: auto;
   }
 }

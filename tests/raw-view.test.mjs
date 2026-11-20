@@ -30,6 +30,15 @@ test("rawSourceKey distingue las incidencias de Navarra del radar de la fuente n
   assert.equal(rawSourceKey(incidencia), "incidencias-navarra");
 });
 
+test("rawSourceKey etiqueta las localizaciones históricas de móviles", () => {
+  const historico = feat({ source: "historico_movil", historical: true });
+  assert.equal(rawSourceKey(historico), "historico_movil");
+  assert.equal(
+    rawSourceStyle("historico_movil").label,
+    "Histórico · móviles no certificados"
+  );
+});
+
 test("rawSourceKey devuelve 'desconocida' cuando el elemento no trae fuente", () => {
   assert.equal(rawSourceKey(feat({})), "desconocida");
 });
@@ -57,6 +66,30 @@ test("isInNavarraScope acepta provincia 31 y OSM de la zona, pero no OSM de Zara
   assert.equal(isInNavarraScope(feat({ source: "osm" }, point(-1.678, 42.808))), true);
   assert.equal(isInNavarraScope(feat({ source: "osm" }, point(-0.918, 41.639))), false);
   assert.equal(isInNavarraScope(feat({ source: "euskadi", province: "48" })), false);
+});
+
+test("isInNavarraScope incluye las incidencias de Navarra aunque no tengan province", () => {
+  // El CSV oficial de Navarra no trae código de provincia: el fichero entero ya
+  // es de Navarra. Sin esto, «Paso alternativo» (a 1 km de Uharte Arakil)
+  // desaparece al marcar «Solo Navarra» en el modo crudo.
+  const incidencia = feat({
+    source: "navarra",
+    title: "Paso alternativo",
+    __dataset: "incidencias-navarra",
+  }, point(-1.56637, 42.87830));
+
+  assert.equal(isInNavarraScope(incidencia), true);
+});
+
+test("filterRawFeatures con onlyNavarra conserva las incidencias del fichero de Navarra", () => {
+  const incidencia = feat({
+    source: "navarra",
+    title: "Paso alternativo",
+    __dataset: "incidencias-navarra",
+  }, point(-1.56637, 42.87830));
+  const euskadi = feat({ source: "euskadi", province: "48" }, point(-2.6, 42.9));
+
+  assert.deepEqual(filterRawFeatures([incidencia, euskadi], { onlyNavarra: true }), [incidencia]);
 });
 
 test("filterRawFeatures sin filtros devuelve los duplicados sin fusionar", () => {

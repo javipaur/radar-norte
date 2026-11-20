@@ -29,8 +29,12 @@ SCRIPTS = [
 
 def main():
     from pathlib import Path
+    import subprocess as sp
 
     scripts_dir = Path(__file__).resolve().parent
+    # Snapshot automático antes de actualizar (respaldo)
+    print("=== Snapshot previo (respaldo) ===")
+    sp.run([sys.executable, str(scripts_dir / "snapshot-history.py")], check=False)
     failures = []
     for label, script in SCRIPTS:
         print(f"\n=== {label} ===")

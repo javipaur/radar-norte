@@ -173,6 +173,43 @@ class FreshnessTests(unittest.TestCase):
 class RadarFeedTests(unittest.TestCase):
     """Una fuente que retira un aviso no debe borrar una localización guardada."""
 
+    def test_el_mensaje_de_alerta_se_puede_imprimir_en_windows(self):
+        # cp1252 (consola de Windows) no puede codificar el emoji ⚠️ y hacía
+        # fallar el pipeline justo cuando más falta hacía el aviso.
+        import importlib.util
+
+        ruta = Path(__file__).resolve().parent / "fetch-radares.py"
+        spec = importlib.util.spec_from_file_location("fetch_radares", ruta)
+        fetch_radares = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fetch_radares)
+
+        mensaje = fetch_radares.mensaje_alerta_perdida(12, 30)
+        mensaje.encode("cp1252")
+        self.assertIn("12", mensaje)
+        self.assertIn("30", mensaje)
+
+    def test_no_pierde_la_nota_de_una_zona_movil_historica(self):
+        # La semilla de Uharte Arakil explica por qué se conserva; el merge
+        # genérico no debe sobrescribir esa explicación con un texto genérico.
+        historica = {
+            "type": "Feature",
+            "id": "movil-historico-uharte-arakil",
+            "geometry": {"type": "Point", "coordinates": [-1.82876, 42.91911]},
+            "properties": {
+                "source": "historico_movil",
+                "historical": True,
+                "historical_note": "Vista en v0.1.0 en el cruce de Uharte Arakil",
+            },
+        }
+        resultado = common.merge_preserved_features([], [historica])
+
+        self.assertEqual(len(resultado), 1)
+        self.assertEqual(
+            resultado[0]["properties"]["historical_note"],
+            "Vista en v0.1.0 en el cruce de Uharte Arakil",
+        )
+        self.assertTrue(resultado[0]["properties"]["historical"])
+
     def test_no_borra_localizaciones_del_feed_anterior(self):
         merge_preserved_features = common.merge_preserved_features
 

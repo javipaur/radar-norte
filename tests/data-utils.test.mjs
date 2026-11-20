@@ -6,6 +6,7 @@ import {
   collectPopupRows,
   featurePaths,
   featuresBounds,
+  sortForRender,
 } from "../src/data-utils.js";
 
 const point = (lon, lat) => ({ type: "Point", coordinates: [lon, lat] });
@@ -13,6 +14,21 @@ const feat = (source, props, geometry = point(-2.7, 42.8)) => ({
   type: "Feature",
   geometry,
   properties: { source, ...props },
+});
+
+test("sortForRender pinta las zonas históricas de móvil encima de las demás", () => {
+  // En SVG el último elemento del DOM queda encima y recibe los clics. En el
+  // cruce de Uharte Arakil hay decenas de marcadores; sin esto el punto que el
+  // usuario quiere ver queda tapado y no se puede abrir su popup.
+  const historica = feat("historico_movil", { name: "Uharte Arakil", historical: true }, point(-1.82876, 42.91911));
+  const fijo = feat("dgt", { name: "Radar fijo" });
+  const móvil = feat("dgt_invive", { name: "Tramo INVIVE" });
+
+  const orden = sortForRender([historica, fijo, móvil]);
+  assert.deepEqual(orden.map((f) => f.properties.name), ["Radar fijo", "Tramo INVIVE", "Uharte Arakil"]);
+  // No muta el array original: el filtro por categoría sigue usando el orden
+  // de los datos.
+  assert.equal(historica.properties.name, "Uharte Arakil");
 });
 
 test("featuresBounds incluye puntos y tramos para que el mapa encuadre también la A-10", () => {

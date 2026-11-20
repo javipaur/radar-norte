@@ -9,6 +9,7 @@ import ssl
 from pathlib import Path
 
 from common import PUBLIC_DIR, merge_preserved_features, write_geojson
+from moviles_historicos import historical_mobile_features
 
 FEED_URL = "https://geiserx.github.io/radares-anunciados-ha/feed.geojson"
 STATUS_URL = "https://geiserx.github.io/radares-anunciados-ha/status.json"
@@ -26,6 +27,15 @@ BBOX_OBJETIVO = [-2.5, 40.0, 0.8, 43.6]
 
 def in_bbox(lon, lat, bbox):
     return bbox[0] <= lon <= bbox[2] and bbox[1] <= lat <= bbox[3]
+
+
+def mensaje_alerta_perdida(conservadas, prev_total):
+    """Aviso imprimible en cualquier consola (incluido cp1252 de Windows)."""
+    return (
+        f"AVISO: el feed filtrado trae solo {conservadas} elementos, "
+        f"pero antes habia {prev_total}. Posible perdida de datos del feed; "
+        "se conservaran los historicos pero revisa la fuente."
+    )
 
 
 def is_in_target_region(props, geom):
@@ -83,10 +93,12 @@ def main():
     # Leer el GeoJSON anterior + todos los históricos para no perder nada nunca
     name = "radares-pais-vasco-navarra-aragon.geojson"
     previous = []
+    prev_total = 0  # solo el archivo actual; los snapshots no cuentan como "antes"
     previous_path = processed_dir / name
     if previous_path.exists():
         try:
             previous = json.loads(previous_path.read_text(encoding="utf-8")).get("features", [])
+            prev_total = len(previous)
         except (ValueError, OSError) as e:
             print(f"Aviso: no se pudo leer el GeoJSON anterior: {e}")
     # Añadir todo lo de snapshots históricos (data/history/*/processed/...)
@@ -111,6 +123,12 @@ def main():
             features_out.append(f)
     
     conservadas = len(features_out)
+    if prev_total > 10 and conservadas < prev_total * 0.7:
+        print(mensaje_alerta_perdida(conservadas, prev_total))
+    # Las zonas de radar móvil vistas en algún momento van SIEMPRE, aunque el
+    # feed actual ya no las incluya (y aunque se hubiera borrado data/processed).
+    historicas = historical_mobile_features()
+    previous = historicas + previous
     features_out = merge_preserved_features(features_out, previous)
     preservadas = len(features_out) - conservadas
     if preservadas:

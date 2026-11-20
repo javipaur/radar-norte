@@ -1,0 +1,14 @@
+# Despliegue en Dokploy con Nixpacks.
+#
+# Nixpacks detecta este repo como app estática de Vite y ya genera:
+#   setup:   Node + npm + caddy
+#   install: npm ci
+#   build:   npm run build
+#   start:   caddy sirviendo dist/ con /assets/Caddyfile
+#
+# La versión de Node se fija en "engines.node" de package.json (Vite 8 exige
+# Node >= 20.19; el valor por defecto de Nixpacks es Node 18 y el build falla).
+# El token '...' conserva los paquetes detectados por el proveedor (npm, caddy):
+# si se omite, se sustituyen todos y Caddy deja de estar disponible.
+[phases.setup]
+nixPkgs = ['...']

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getCategory } from "../src/categories.js";
+import { getCategory, isHistoricalMobile } from "../src/categories.js";
 
 const feature = (properties, geometry = { type: "Point", coordinates: [-2.7, 42.8] }) => ({
   type: "Feature",
@@ -45,6 +45,28 @@ test("todos los tramos dgt_invive son Móviles", () => {
     const f = feature({ ...t, source: "dgt_invive", kind: "stretch" });
     assert.equal(getCategory(f), "moviles", `falló: ${t.name}`);
   }
+});
+
+test("una localización histórica de móvil se clasifica como Móvil", () => {
+  const historico = feature({
+    source: "historico_movil",
+    kind: "mobile_recurring",
+    name: "Radar móvil posible · Uharte Arakil (NA-2410)",
+    historical: true,
+  });
+  assert.equal(getCategory(historico), "moviles");
+});
+
+test("isHistoricalMobile distingue la zona no certificada del tramo oficial", () => {
+  const historico = feature({
+    source: "historico_movil",
+    kind: "mobile_recurring",
+    historical: true,
+  });
+  const oficial = feature({ source: "dgt_invive", kind: "stretch", historical: true });
+
+  assert.equal(isHistoricalMobile(historico), true);
+  assert.equal(isHistoricalMobile(oficial), false);
 });
 
 test("el resto de categorías no cambian", () => {
