@@ -10,6 +10,16 @@ Aplicación web (React + Vite + Leaflet) para visualizar radares e incidencias d
 - Incidencias de tráfico (Navarra y Euskadi)
 - Ubicaciones de radares móviles y foto-rojo publicadas por el Ayuntamiento de Vitoria-Gasteiz (datos descargados automáticamente del visor GeoVitoria)
 
+## Avisos por voz y sonido
+El botón **🔔 Alertas** activa avisos por proximidad usando la geolocalización del dispositivo (sin enviar la posición a ningún servidor):
+
+- **Acercamiento** (menos de 1500 m): chime suave y voz con vía, pk y distancia.
+- **Dentro de un tramo** (menos de 60 m): aviso tenue al entrar, que no se repite hasta salir y volver a entrar.
+- Si varios elementos disparan a la vez, solo se anuncia **el más cercano**. Las zonas posibles, históricas, inactivas o caducadas se indican como «no certificadas».
+- El botón **Probar aviso** comprueba sonido y voz sin necesidad de geolocalización.
+
+Los avisos funcionan con la pantalla encendida. Los navegadores móviles **no garantizan** audio ni geolocalización en segundo plano o con la pantalla apagada. Si el navegador no soporta síntesis de voz, se usan solo los chimes.
+
 ## Stack
 - React 19 + Vite + react-leaflet / Leaflet
 - Datos en GeoJSON estáticos (generados por scripts Python en `scripts/`)

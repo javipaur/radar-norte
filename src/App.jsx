@@ -24,20 +24,15 @@ import {
   getCategory,
 } from "./legend.jsx";
 import { isHistoricalMobile } from "./categories.js";
+import {
+  buildAlertMessage,
+  chooseAlert,
+  collectAlerts,
+  playChime as playChimeOn,
+  speakAlertText,
+} from "./alert-utils.js";
 
 const APP_VERSION = "0.3.0";
-
-function haversineDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
 function getPointCoords(feature) {
   const geom = feature.geometry;
@@ -140,7 +135,13 @@ export default function App() {
   const [voiceStatus, setVoiceStatus] = useState("");
   const [activeCategory, setActiveCategory] = useState(null);
   const [rawOpen, setRawOpen] = useState(false);
-  const lastAlertRef = useRef(0);
+  // Los avisos leen datos y estado desde refs: el callback de watchPosition se
+  // registra una vez y no debe quedar atrapado en un render antiguo.
+  const featuresRef = useRef([]);
+  const alertStateRef = useRef(new Map());
+  const watchIdRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const voiceOnRef = useRef(false);
   const didFitRef = useRef(false);
 
   const scopeCounts = useMemo(
@@ -176,6 +177,14 @@ export default function App() {
     ? ALL_CATEGORIES.find((c) => c.id === activeCategory)?.label || activeCategory
     : null;
   const statusText = `${categoryLabel ? `Categoría ${categoryLabel}: ` : ""}${displayFeatures.length} de ${features.length} elementos · ${Object.keys(rawSourceCounts(features)).length} fuentes${onlyNavarra ? " · solo Navarra" : ""}${rawSource ? ` · fuente ${rawSourceStyle(rawSource).label}` : ""}`;
+
+  useEffect(() => {
+    featuresRef.current = features;
+  }, [features]);
+
+  useEffect(() => {
+    voiceOnRef.current = voiceOn;
+  }, [voiceOn]);
 
   // La leyenda crece cuando llegan los datos y cambia la altura del mapa.
   // Sin invalidateSize, Leaflet sigue usando el tamaño inicial y recorta el
@@ -245,13 +254,87 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onlyNavarra, rawSource, activeCategory]);
 
-  const speak = useCallback((text) => {
-    if (!voiceOn || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "es-ES";
-    window.speechSynthesis.speak(utter);
-  }, [voiceOn]);
+  // El audio se crea siempre dentro de un gesto del usuario (clic): los
+  // navegadores móviles bloquean AudioContext creado fuera de ese gesto.
+  const ensureAudio = useCallback(() => {
+    if (audioCtxRef.current) {
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+      return audioCtxRef.current;
+    }
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    try {
+      audioCtxRef.current = new Ctor();
+    } catch {
+      return null;
+    }
+    return audioCtxRef.current;
+  }, []);
+
+  const playChime = useCallback((kind) => playChimeOn(audioCtxRef.current, kind), []);
+
+  const speakText = useCallback((text, kind) => {
+    if (typeof window === "undefined") return;
+    speakAlertText(window.speechSynthesis, window.SpeechSynthesisUtterance, text, kind);
+  }, []);
+
+  const speakAlert = useCallback((text, kind) => {
+    if (!voiceOnRef.current) return;
+    speakText(text, kind);
+  }, [speakText]);
+
+  const onPosition = useCallback((pos) => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    // Los avisos ignoran los filtros visuales (categoría, fuente y Navarra):
+    // solo se excluyen las incidencias, que no son radares.
+    const candidatos = featuresRef.current.filter(
+      (f) => !String(rawSourceKey(f)).startsWith("incidencias-")
+    );
+    const now = Date.now();
+    const result = collectAlerts(candidatos, lat, lon, now, alertStateRef.current);
+    alertStateRef.current = result.states;
+    const elegido = chooseAlert(result.triggers);
+    if (!elegido) return;
+    const texto = buildAlertMessage(elegido.feature, elegido.kind, elegido.distanceMeters, now);
+    playChime(elegido.kind);
+    speakAlert(texto, elegido.kind);
+    setVoiceStatus(texto);
+  }, [playChime, speakAlert]);
+
+  const stopAlerts = useCallback(() => {
+    if (watchIdRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    const ctx = audioCtxRef.current;
+    audioCtxRef.current = null;
+    if (ctx && ctx.state !== "closed") {
+      try {
+        ctx.close().catch(() => {});
+      } catch {
+        // Ignorar fallos al cerrar el contexto.
+      }
+    }
+    setVoiceStatus("");
+  }, []);
+
+  const startAlerts = useCallback(() => {
+    ensureAudio();
+    if (!navigator.geolocation || watchIdRef.current !== null) return;
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      onPosition,
+      (err) => setStatus("Error de geolocalización: " + err.message),
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+    );
+  }, [ensureAudio, onPosition]);
+
+  useEffect(() => () => stopAlerts(), [stopAlerts]);
 
   const handleLocate = useCallback(() => {
     if (!navigator.geolocation) {
@@ -266,48 +349,36 @@ export default function App() {
           mapRef.current.setView([lat, lon], 13);
         }
         setStatus(`Ubicación: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-        let closest = null;
-        let closestDist = Infinity;
-        let alertFeatures = filterRawFeatures(features, { onlyNavarra, source: rawSource });
-        if (activeCategory) {
-          alertFeatures = alertFeatures.filter((f) => getCategory(f) === activeCategory);
-        }
-        alertFeatures
-          .filter((f) => !String(rawSourceKey(f)).startsWith("incidencias-"))
-          .forEach((f) => {
-            const coords = getPointCoords(f);
-            if (!coords) return;
-            const dist = haversineDistance(lat, lon, coords.lat, coords.lon);
-            if (dist < closestDist) {
-              closestDist = dist;
-              closest = f;
-            }
-          });
-        if (closest && closestDist <= 1500) {
-          const now = Date.now();
-          if (now - lastAlertRef.current > 30000) {
-            lastAlertRef.current = now;
-            const name = closest.properties?.name || closest.properties?.road_ref || "Radar";
-            speak(`Atención, ${name} a ${Math.round(closestDist)} metros`);
-            setVoiceStatus(`Cercano: ${name} a ${Math.round(closestDist)}m`);
-          }
-        } else {
-          setVoiceStatus("");
-        }
       },
       (err) => alert("No se pudo obtener ubicación: " + err.message),
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [speak, features, onlyNavarra, rawSource, activeCategory]);
+  }, []);
 
-  const toggleVoice = () => {
-    if (!("speechSynthesis" in window)) {
-      alert("Tu navegador no soporta síntesis de voz.");
+  const toggleAlerts = () => {
+    if (voiceOn) {
+      voiceOnRef.current = false;
+      stopAlerts();
+      setVoiceOn(false);
       return;
     }
-    const newState = !voiceOn;
-    setVoiceOn(newState);
-    if (newState) speak("Alertas de voz activadas");
+    if (!navigator.geolocation) {
+      alert("Geolocalización no disponible.");
+      return;
+    }
+    voiceOnRef.current = true;
+    setVoiceOn(true);
+    startAlerts();
+    // Safari iOS exige hablar dentro del gesto del clic para desbloquear la
+    // voz; si no, los avisos posteriores (fuera del gesto) se ignoran.
+    speakText("Alertas activadas", "approach");
+  };
+
+  const handleTestAlert = () => {
+    ensureAudio();
+    playChime("approach");
+    speakText("Radar cercano, A-1 pk 12,3, a 500 metros · prueba", "approach");
+    setVoiceStatus("Prueba de aviso: radar cercano, A-1 pk 12,3, a 500 metros");
   };
 
   const toggleCategory = (id) => {
@@ -322,8 +393,11 @@ export default function App() {
       </header>
       <div className="controls">
         <button type="button" onClick={handleLocate} title="Centrar en mi ubicación">📍 Mi ubicación</button>
-        <button type="button" onClick={toggleVoice} aria-pressed={voiceOn}>
-          {voiceOn ? "🔊 Voz: ON" : "🔊 Voz: OFF"}
+        <button type="button" onClick={toggleAlerts} aria-pressed={voiceOn} title="Avisos por voz y sonido al acercarse a un radar">
+          {voiceOn ? "🔔 Alertas: ON" : "🔔 Alertas: OFF"}
+        </button>
+        <button type="button" onClick={handleTestAlert} title="Probar sonido y voz sin geolocalización">
+          Probar aviso
         </button>
         <label className="raw-toggle">
           <input
